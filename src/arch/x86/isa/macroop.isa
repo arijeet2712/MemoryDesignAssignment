@@ -126,6 +126,14 @@ def template MacroConstructor {{
             //alloc_microops is the code that sets up the microops
             //array in the parent class.
             %(alloc_microops)s;
+            const auto &lastMicroop = microops[numMicroops - 1];
+            flags[IsControl] = lastMicroop->isControl();
+            flags[IsCall] = lastMicroop->isCall();
+            flags[IsReturn] = lastMicroop->isReturn();
+            flags[IsDirectControl] = lastMicroop->isDirectCtrl();
+            flags[IsIndirectControl] = lastMicroop->isIndirectCtrl();
+            flags[IsCondControl] = lastMicroop->isCondCtrl();
+            flags[IsUncondControl] = lastMicroop->isUncondCtrl();
         }
 }};
 

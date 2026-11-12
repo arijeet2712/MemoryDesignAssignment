@@ -445,6 +445,7 @@ class BaseMinorCPU(BaseCPU):
         ),
         "Branch Predictor",
     )
+    enableBranchPrediction = Param.Bool(False, "Enable branch prediction")
 
     def addCheckerCpu(self):
         print("Checker not yet supported by MinorCPU")

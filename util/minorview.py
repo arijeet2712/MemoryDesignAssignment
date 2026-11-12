@@ -37,7 +37,13 @@
 #
 # minorview.py: Minorview visuliser for MinorCPU model MinorTrace output
 #
+import gi
 
+gi.require_version("Gtk", "3.0")
+from gi import pygtkcompat
+
+pygtkcompat.enable()
+pygtkcompat.enable_gtk(version="3.0")
 import argparse
 import os
 import sys

@@ -55,42 +55,34 @@ namespace gem5
 namespace minor
 {
 
-Fetch2::Fetch2(const std::string &name,
-    MinorCPU &cpu_,
-    const BaseMinorCPUParams &params,
-    Latch<ForwardLineData>::Output inp_,
-    Latch<BranchData>::Output branchInp_,
+Fetch2::Fetch2(
+    const std::string &name, MinorCPU &cpu_, const BaseMinorCPUParams &params,
+    Latch<ForwardLineData>::Output inp_, Latch<BranchData>::Output branchInp_,
     Latch<BranchData>::Input predictionOut_,
     Latch<ForwardInstData>::Input out_,
-    std::vector<InputBuffer<ForwardInstData>> &next_stage_input_buffer) :
-    Named(name),
-    cpu(cpu_),
-    inp(inp_),
-    branchInp(branchInp_),
-    predictionOut(predictionOut_),
-    out(out_),
-    nextStageReserve(next_stage_input_buffer),
-    outputWidth(params.decodeInputWidth),
-    processMoreThanOneInput(params.fetch2CycleInput),
-    branchPredictor(*params.branchPred),
-    fetchInfo(params.numThreads),
-    threadPriority(0), stats(&cpu_)
-{
-    if (outputWidth < 1)
-        fatal("%s: decodeInputWidth must be >= 1 (%d)\n", name, outputWidth);
+    std::vector<InputBuffer<ForwardInstData>> &next_stage_input_buffer)
+    : Named(name), cpu(cpu_), inp(inp_), branchInp(branchInp_),
+      predictionOut(predictionOut_), out(out_),
+      nextStageReserve(next_stage_input_buffer),
+      outputWidth(params.decodeInputWidth),
+      processMoreThanOneInput(params.fetch2CycleInput),
+      branchPredictor(*params.branchPred),
+      enableBranchPrediction(params.enableBranchPrediction),
+      fetchInfo(params.numThreads), threadPriority(0), stats(&cpu_) {
+  if (outputWidth < 1)
+    fatal("%s: decodeInputWidth must be >= 1 (%d)\n", name, outputWidth);
 
-    if (params.fetch2InputBufferSize < 1) {
-        fatal("%s: fetch2InputBufferSize must be >= 1 (%d)\n", name,
-        params.fetch2InputBufferSize);
-    }
+  if (params.fetch2InputBufferSize < 1) {
+    fatal("%s: fetch2InputBufferSize must be >= 1 (%d)\n", name,
+          params.fetch2InputBufferSize);
+  }
 
-    /* Per-thread input buffers */
-    for (ThreadID tid = 0; tid < params.numThreads; tid++) {
-        inputBuffer.push_back(
-            InputBuffer<ForwardLineData>(
-                name + ".inputBuffer" + std::to_string(tid), "lines",
-                params.fetch2InputBufferSize));
-    }
+  /* Per-thread input buffers */
+  for (ThreadID tid = 0; tid < params.numThreads; tid++) {
+    inputBuffer.push_back(InputBuffer<ForwardLineData>(
+        name + ".inputBuffer" + std::to_string(tid), "lines",
+        params.fetch2InputBufferSize));
+  }
 }
 
 const ForwardLineData *
@@ -195,25 +187,26 @@ Fetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
     assert(!inst->predictedTaken);
 
     /* Skip non-control/sys call instructions */
-    if (inst->staticInst->isControl() || inst->staticInst->isSyscall()){
-        std::unique_ptr<PCStateBase> inst_pc(inst->pc->clone());
+    if ((inst->staticInst->isControl() || inst->staticInst->isSyscall()) &&
+        enableBranchPrediction) {
+      std::unique_ptr<PCStateBase> inst_pc(inst->pc->clone());
 
-        /* Tried to predict */
-        inst->triedToPredict = true;
+      /* Tried to predict */
+      inst->triedToPredict = true;
 
-        DPRINTF(Branch, "Trying to predict for inst: %s\n", *inst);
+      DPRINTF(Branch, "Trying to predict for inst: %s\n", *inst);
 
-        cpu.fetchStats[inst->id.threadId]->numBranches++;
-        if (branchPredictor
-                .predict(inst->staticInst, inst->id.fetchSeqNum, *inst_pc,
-                         inst->id.threadId)
-                .taken) {
-            set(branch.target, *inst_pc);
-            inst->predictedTaken = true;
-            set(inst->predictedTarget, inst_pc);
-        }
+      cpu.fetchStats[inst->id.threadId]->numBranches++;
+      if (branchPredictor
+              .predict(inst->staticInst, inst->id.fetchSeqNum, *inst_pc,
+                       inst->id.threadId)
+              .taken) {
+        set(branch.target, *inst_pc);
+        inst->predictedTaken = true;
+        set(inst->predictedTarget, inst_pc);
+      }
     } else {
-        DPRINTF(Branch, "Not attempting prediction for inst: %s\n", *inst);
+      DPRINTF(Branch, "Not attempting prediction for inst: %s\n", *inst);
     }
 
     /* If we predict taken, set branch and update sequence numbers */
